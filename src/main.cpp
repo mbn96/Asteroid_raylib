@@ -1,9 +1,11 @@
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <iostream>
+#include <memory>
 #include <raylib.h>
 #include <raymath.h>
 #include <utility>
@@ -47,7 +49,7 @@ private:
   Vector2 vel;
   int angularSpeed;
   float angle = 0;
-  Vector2 shape[N];
+  std::shared_ptr<std::array<Vector2, N>> shape;
   uint8_t size;
   float scale = 10.0;
 
@@ -57,25 +59,14 @@ public:
   Rock(Vector2 pos, Vector2 vel, int angularSpeer, uint8_t size)
       : pos(pos), vel(vel), angularSpeed(angularSpeer), size(size) {
     Vector2 unitVec = {0, 1};
+    shape = std::make_shared<std::array<Vector2, N>>();
     for (size_t i = 0; i < N; i++) {
-      shape[i] = Vector2Scale(Vector2Rotate(unitVec, (2 * i * PI) / N),
-                              GetRandomValue(85, 99) / 100.0);
+      (*shape)[i] = Vector2Scale(Vector2Rotate(unitVec, (2 * i * PI) / N),
+                                 GetRandomValue(85, 99) / 100.0);
     }
   }
   Rock() = default;
   Rock(const Rock &r) = default;
-  // Rock(Rock &&r) = default;
-
-  Rock &operator=(const Rock &o) {
-    this->pos = o.pos;
-    this->vel = o.vel;
-    this->angularSpeed = o.angularSpeed;
-    this->angle = o.angle;
-    this->size = o.size;
-    this->scale = o.scale;
-    memcpy(this->shape, o.shape, N * sizeof(Vector2));
-    return *this;
-  }
 
   bool update(float dt) {
     angle += (DEG2RAD * angularSpeed) * dt;
@@ -90,7 +81,7 @@ public:
     Vector2 temp[N];
     for (size_t i = 0; i < N; i++) {
       temp[i] = Vector2Add(
-          pos, Vector2Rotate(Vector2Scale(shape[i], scale * size), angle));
+          pos, Vector2Rotate(Vector2Scale((*shape)[i], scale * size), angle));
     }
     DrawLineStrip(temp, N, PINK);
     DrawLineV(temp[N - 1], temp[0], PINK);
