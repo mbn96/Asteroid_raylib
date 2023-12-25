@@ -3,11 +3,13 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <memory>
 #include <raylib.h>
 #include <raymath.h>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -29,6 +31,12 @@ static Vector2 wrapToScreen(const Vector2 &v) {
   pos.y = pos.y < 0 ? HEIGHT : pos.y;
   return pos;
 }
+
+struct GameState {
+  bool isRunning = true;
+  int score = 0;
+  int bestScore = 0;
+};
 
 class IGameObject {
 
@@ -70,7 +78,19 @@ public:
 
   bool update(float dt) {
     angle += (DEG2RAD * angularSpeed) * dt;
-    pos = wrapToScreen(Vector2Add(pos, Vector2Scale(vel, dt)));
+    pos = Vector2Add(pos, Vector2Scale(vel, dt));
+    if (pos.x > WIDTH || pos.x < 0 || pos.y > HEIGHT || pos.y < 0) {
+      float x_out = pos.x > WIDTH ? pos.x - WIDTH : 0;
+      x_out = pos.x < 0 ? -pos.x : x_out;
+
+      float y_out = pos.y > HEIGHT ? pos.y - HEIGHT : 0;
+      y_out = pos.y < 0 ? -pos.y : y_out;
+
+      float max_diff = std::max(x_out, y_out);
+      if (max_diff >= getRadious()) {
+        pos = wrapToScreen(pos);
+      }
+    }
     return true;
   }
 
@@ -126,6 +146,7 @@ public:
         }
         std::swap(rocks[i], rocks.back());
         rocks.pop_back();
+        store.getObj<GameState>().score++;
         return false;
       }
     }
@@ -201,8 +222,9 @@ public:
     for (size_t i = 0; i < rocks.size(); i++) {
       auto &r = rocks[i];
       if (isCollision(r)) {
-        auto &d = store.getObj<bool>();
-        d = true;
+        auto &state = store.getObj<GameState>();
+        state.isRunning = false;
+        state.bestScore = std::max(state.score, state.bestScore);
         printf("collision detected...\n");
         return false;
       }
@@ -239,12 +261,14 @@ static Rock<ROCK_SIDES> spawnRandom() {
                  static_cast<float>(GetRandomValue(30, 150))};
 
   return Rock<ROCK_SIDES>(Vector2Add(playerPos, rockOffset), vel,
-                          GetRandomValue(30, 70), 8);
+                          GetRandomValue(-180, 180), 8);
 }
 
 int main(int argc, char *argv[]) {
   std::cout << "Hello Asteroids!" << std::endl;
   std::cout << "Sizeof(Rock): " << sizeof(Rock<ROCK_SIDES>) << std::endl;
+  const static char *game_over_text = "     Game Over\n"
+                                      "Press R to restart.";
 
   InitWindow(WIDTH, HEIGHT, "Asteroids - Raylib");
   if (!IsWindowReady()) {
@@ -253,9 +277,10 @@ int main(int argc, char *argv[]) {
   }
   SetTargetFPS(65);
 
+  store.setObj(GameState());
   store.setObj(Ship());
   // FIXME: menu system need a lot of work...
-  store.setObj(false);
+  // store.setObj(false);
   store.setObj(std::vector<Bullet>());
   store.setObj(std::vector<Rock<ROCK_SIDES>>());
 
@@ -264,14 +289,35 @@ int main(int argc, char *argv[]) {
 
   float last_spawn = 0;
   float spawn_interval = 5.0;
+  char score_text[32];
+
+  SetTextLineSpacing(26 + 14);
+  auto game_over_width = MeasureText(game_over_text, 26);
 
   while (!WindowShouldClose()) {
-    if (store.getObj<bool>()) {
+    auto &state = store.getObj<GameState>();
+
+    if (!state.isRunning) {
+      if (IsKeyReleased(KEY_R)) {
+        store.setObj(Ship());
+        // store.setObj(false);
+        store.setObj(std::vector<Bullet>());
+        store.setObj(std::vector<Rock<ROCK_SIDES>>());
+
+        state.isRunning = true;
+        state.score = 0;
+      }
       ClearBackground(BLACK);
       BeginDrawing();
       DrawFPS(10, 10);
+      sprintf(score_text, "Score: %d", state.score);
+      DrawText(score_text, 150, 10, 22, WHITE);
 
-      DrawText("Game Over", 100, 100, 26, RED);
+      sprintf(score_text, "Highscore: %d", state.bestScore);
+      DrawText(score_text, 150, 50, 26, WHITE);
+
+      DrawText(game_over_text, (WIDTH - game_over_width) / 2, (HEIGHT - 26) / 2,
+               26, RED);
       EndDrawing();
       continue;
     }
@@ -290,6 +336,7 @@ int main(int argc, char *argv[]) {
       rocks.push_back(spawnRandom());
     }
 
+    // NOTE: this might cause undefined behavior, I don't know
     for (auto b = bullets.rbegin(); b != bullets.rend(); b++) {
       if (!b->update(dt)) {
         std::swap(*b, bullets.back());
@@ -301,9 +348,13 @@ int main(int argc, char *argv[]) {
       r.update(dt);
     }
 
+    // ClearBackground({0x30, 0x40, 0x50, 0xff});
     ClearBackground(BLACK);
     BeginDrawing();
     DrawFPS(10, 10);
+
+    sprintf(score_text, "Score: %d", state.score);
+    DrawText(score_text, 150, 10, 18, WHITE);
 
     store.getObj<Ship>().draw();
     for (auto &b : bullets) {
