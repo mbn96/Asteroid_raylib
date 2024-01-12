@@ -63,6 +63,7 @@ private:
   std::shared_ptr<std::array<Vector2, N>> shape;
   uint8_t size;
   float scale = 10.0;
+  float aliveTime = 0;
 
   friend class Bullet;
 
@@ -82,8 +83,12 @@ public:
   Rock(const Rock &r) = default;
 
   bool update(float dt) {
+    if (aliveTime > 6) {
+      return false;
+    }
     angle += (DEG2RAD * angularSpeed) * dt;
     pos = Vector2Add(pos, Vector2Scale(vel, dt));
+    aliveTime += dt;
     // if (pos.x > WIDTH || pos.x < 0 || pos.y > HEIGHT || pos.y < 0) {
     //   float x_out = pos.x > WIDTH ? pos.x - WIDTH : 0;
     //   x_out = pos.x < 0 ? -pos.x : x_out;
@@ -146,8 +151,12 @@ public:
           c1.size >>= 1;
           c2.size >>= 1;
 
-          c1.vel = Vector2Subtract(pos, c1.pos);
-          c2.vel = Vector2Scale(c1.vel, -1);
+          c1.aliveTime = c2.aliveTime = 0.0f;
+
+          c1.vel =
+              Vector2Add(c1.vel, (Vector2){c1.vel.y / 2.0f, -c1.vel.x / 2.0f});
+          c2.vel =
+              Vector2Add(c2.vel, (Vector2){-c2.vel.y / 2.0f, c2.vel.x / 2.0f});
           rocks.push_back(c1);
           rocks.push_back(c2);
         }
@@ -241,7 +250,8 @@ public:
     return true;
   }
 
-  const Vector2 &getPos() const { return this->pos; }
+  inline const Vector2 &getPos() const { return this->pos; }
+  inline const Vector2 &getVel() const { return this->v; }
 
   void draw() const {
     auto fv = Vector2Add(pos, Vector2Scale(forward, scale));
@@ -263,11 +273,13 @@ public:
 
 static Rock<ROCK_SIDES> spawnRandom() {
   auto &playerPos = store.getObj<Ship>().getPos();
+  auto &playerVel = store.getObj<Ship>().getVel();
   Vector2 rockOffset = {std::max(WIDTH / 2, HEIGHT / 2), 0.0F};
   rockOffset =
       Vector2Rotate(rockOffset, ((float)rand() / (float)RAND_MAX) * PI * 2.0F);
-  Vector2 vel = Vector2Scale(Vector2Normalize(rockOffset),
-                             -(float)GetRandomValue(150, 300));
+  Vector2 vel =
+      Vector2Add(playerVel, Vector2Scale(Vector2Normalize(rockOffset),
+                                         -(float)GetRandomValue(150, 300)));
 
   return Rock<ROCK_SIDES>(Vector2Add(playerPos, rockOffset), vel,
                           GetRandomValue(-180, 180), 8);
@@ -288,6 +300,7 @@ int main(int argc, char *argv[]) {
   SetTargetFPS(65);
 
   // Loading BG texture and shader
+  // Texture2D bg = LoadTexture("assets/bg_grid_5.png");
   Texture2D bg = LoadTexture("assets/bg.png");
   Shader bg_shder = LoadShader(nullptr, "assets/bg.fs.glsl");
 
@@ -302,10 +315,10 @@ int main(int argc, char *argv[]) {
 
   store.getObj<std::vector<Rock<ROCK_SIDES>>>().push_back(
       Rock<ROCK_SIDES>({150, 150}, {25, 25}, 30, 8));
+
   Camera2D c = {0};
   c.zoom = 1.0f;
   c.offset = {WIDTH / 2.0f, HEIGHT / 2.0f};
-
   store.setObj(std::move(c));
 
   float last_spawn = 0;
@@ -355,7 +368,7 @@ int main(int argc, char *argv[]) {
     last_spawn += dt;
     if (last_spawn >= spawn_interval) {
       last_spawn = 0;
-      spawn_interval = std::max(spawn_interval - 0.1F, 3.0F);
+      spawn_interval = std::max(spawn_interval - 0.1F, 1.0F);
       rocks.push_back(spawnRandom());
     }
 
@@ -367,8 +380,11 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    for (auto &r : rocks) {
-      r.update(dt);
+    for (auto r = rocks.rbegin(); r != rocks.rend(); r++) {
+      if (!r->update(dt)) {
+        std::swap(*r, rocks.back());
+        rocks.pop_back();
+      }
     }
 
     // ClearBackground({0x30, 0x40, 0x50, 0xff});
