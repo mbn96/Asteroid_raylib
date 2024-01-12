@@ -1,0 +1,8 @@
+# { "Checks": "a*,b*,c*,f*,g*,h*,m*,p*,r*,z*" }
+# { "Checks": "bug*,perf*,c*,m*,r*,g*" }
+
+
+
+
+# { "Checks": "bug*,perf*,c*" }
+{ "Checks": "bug*,perf*" }

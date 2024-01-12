@@ -32,6 +32,6 @@ public:
   }
   template <typename T> void setObj(T &&o) {
     auto tName = typeid(T).name();
-    objects.insert_or_assign(tName, std::make_shared<Wrapper<T>>(std::move(o)));
+    objects.insert_or_assign(tName, std::make_shared<Wrapper<T>>(std::forward<T>(o)));
   }
 };
