@@ -210,21 +210,21 @@ public:
   bool update(float dt) {
     thrust = false;
     float rotateAngle{0};
-    if (IsKeyDown(KEY_RIGHT)) {
-      rotateAngle = rotationSpeed * dt;
-    } else if (IsKeyDown(KEY_LEFT)) {
-      rotateAngle = -rotationSpeed * dt;
-    }
+    // if (IsKeyDown(KEY_RIGHT)) {
+    rotateAngle += rotationSpeed * dt * (float)IsKeyDown(KEY_RIGHT);
+    // } else if (IsKeyDown(KEY_LEFT)) {
+    rotateAngle -= rotationSpeed * dt * (float)IsKeyDown(KEY_LEFT);
+    // }
     if (rotateAngle != 0) {
       forward = Vector2Rotate(forward, rotateAngle);
       right = Vector2Rotate(right, rotateAngle);
       left = Vector2Rotate(left, rotateAngle);
     }
 
-    if (IsKeyDown(KEY_UP)) {
-      v = Vector2Add(v, Vector2Scale(forward, dt * acc));
-      thrust = true;
-    }
+    // if (IsKeyDown(KEY_UP)) {
+    thrust = IsKeyDown(KEY_UP);
+    v = Vector2Add(v, Vector2Scale(forward, dt * acc * (float)thrust));
+    // }
     // pos = wrapToScreen(Vector2Add(pos, Vector2Scale(v, dt)));
     pos = Vector2Add(pos, Vector2Scale(v, dt));
 
